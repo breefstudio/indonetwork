@@ -17,7 +17,8 @@ export const initialize = async () => {
   Category.hasOne(Category, { foreignKey: { name: 'parentId' } })
   Company.belongsTo(Category, { foreignKey: { name: 'categoryId' } })
 
-  await Promise.all([Category.sync(), Company.sync()])
+  await Category.sync()
+  await Company.sync()
 
   return sequelize
 }
