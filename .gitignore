@@ -3,6 +3,7 @@ build
 puppeteer
 
 .vscode
+.env
 
 # Mac
 .DS_Store
