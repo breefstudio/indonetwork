@@ -41,7 +41,7 @@ export const attributes: ModelAttributes = {
     type: DataTypes.STRING
   },
   address: {
-    type: DataTypes.STRING
+    type: DataTypes.TEXT
   },
   city: {
     type: DataTypes.STRING
