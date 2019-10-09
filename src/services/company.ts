@@ -63,20 +63,24 @@ const getLeads = async (tab: Page, selector: string): Promise<string> => {
   }
   const text = await getPropertyValue(handle, 'id')
   handle.click()
-  const response = await tab.waitForResponse(r => {
-    if (r.url() !== 'https://www.indonetwork.co.id/leads') {
-      return false
-    }
-    const request = r.request()
-    const body = request.postData()
-    if (!body || body.length === 0) {
-      return false
-    }
-    const parsed = parse(body)
-    return parsed.text === `'${text}'`
-  })
-  const data = await response.json()
-  return data.text
+  try {
+    const response = await tab.waitForResponse(r => {
+      if (r.url() !== 'https://www.indonetwork.co.id/leads') {
+        return false
+      }
+      const request = r.request()
+      const body = request.postData()
+      if (!body || body.length === 0) {
+        return false
+      }
+      const parsed = parse(body)
+      return parsed.text === `'${text}'`
+    })
+    const data = await response.json()
+    return data.text
+  } catch (e) {
+    return ''
+  }
 }
 
 export const getCompany = async (tab: Page): Promise<Company> => {
