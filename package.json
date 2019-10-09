@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "ts-node-dev --project tsconfig.json --respawn --transpileOnly src/index.ts",
+    "build": "tsc",
+    "prod": "npm run build && node build/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "tslint": "tslint --fix",
     "prettier": "prettier --write"
@@ -11,9 +14,13 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/dotenv": "^6.1.1",
+    "@types/bluebird": "^3.5.27",
+    "@types/puppeteer": "^1.20.1",
     "husky": "^3.0.8",
     "lint-staged": "^9.4.1",
     "prettier": "^1.18.2",
+    "ts-node-dev": "^1.0.0-pre.43",
     "tslint": "^5.20.0",
     "tslint-config-prettier": "^1.18.0",
     "tslint-plugin-prettier": "^2.0.1",
@@ -35,7 +42,11 @@
     ]
   },
   "dependencies": {
+    "dotenv": "^8.1.0",
+    "mysql2": "^1.7.0",
     "puppeteer": "^1.20.0",
-    "puppeteer-core": "^1.20.0"
+    "puppeteer-core": "^1.20.0",
+    "query-string": "^6.8.3",
+    "sequelize": "^5.19.4"
   }
 }

@@ -1,15 +1,11 @@
 {
     "defaultSeverity": "error",
-    "extends": ["tslint:recommended", "tslint-etc", "tslint-config-prettier"],
+    "extends": ["tslint:recommended", "tslint-config-prettier"],
     "jsRules": {
         "object-literal-sort-keys": false
     },
     "rules": {
         "prettier": [true, ".prettierrc.json"],
-        "react-hooks-nesting": "error",
-        "no-unused-declaration": { "severity": "error" },
-        "throw-error": { "severity": "error" },
-        "no-assign-mutated-array": { "severity": "error" },
         "object-literal-sort-keys": false,
         "interface-name": [true, "never-prefix"],
         "no-unused-expression": true,

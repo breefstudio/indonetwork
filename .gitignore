@@ -1,4 +1,8 @@
 node_modules
+build
+puppeteer
+
+.vscode
 
 # Mac
 .DS_Store
