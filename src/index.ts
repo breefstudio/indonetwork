@@ -60,7 +60,24 @@ const scrapeCompany = async (tab: Page, url: string) => {
 }
 
 const syncCompanies = async (tab: Page, id: string, page: number = 1) => {
-  const { companies, hasNext } = await scrapeCompanies([], tab, id, page)
+  if (!(await isLoggedIn(tab))) {
+    await login(tab, auth)
+  }
+  let companies: Company[]
+  let hasNext = false
+  try {
+    const result = await scrapeCompanies([], tab, id, page)
+    companies = result.companies
+    hasNext = result.hasNext
+  } catch (e) {
+    if (!(await isLoggedIn(tab))) {
+      await login(tab, auth)
+      const result = await scrapeCompanies([], tab, id, page)
+      companies = result.companies
+      hasNext = result.hasNext
+    }
+    throw e
+  }
   if (companies.length === 0) {
     return
   }
