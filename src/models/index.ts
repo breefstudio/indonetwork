@@ -12,7 +12,7 @@ export const initialize = async () => {
     sequelize,
     charset: 'utf8mb4',
     tableName: 'categories',
-    indexes: [{ fields: ['index'] }]
+    indexes: [{ fields: ['id'], unique: true }]
   })
   Company.init(companyAttributes, {
     sequelize,
@@ -20,8 +20,10 @@ export const initialize = async () => {
     tableName: 'companies'
   })
 
-  Category.hasOne(Category, { foreignKey: { name: 'parentId' } })
-  Company.belongsTo(Category, { foreignKey: { name: 'categoryId' } })
+  Category.hasOne(Category, { foreignKey: { name: 'parentId', field: 'id' } })
+  Company.belongsTo(Category, {
+    foreignKey: { name: 'categoryId', field: 'id' }
+  })
 
   await Category.sync()
   await Company.sync()

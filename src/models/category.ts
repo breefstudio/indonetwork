@@ -15,14 +15,14 @@ export default class Category extends Model {
 
 export const attributes: ModelAttributes = {
   id: {
-    type: DataTypes.STRING,
-    primaryKey: true
+    type: DataTypes.STRING
   },
   name: {
     type: DataTypes.STRING
   },
   index: {
     type: DataTypes.INTEGER,
+    primaryKey: true,
     autoIncrement: true
   }
 }
