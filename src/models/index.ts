@@ -20,10 +20,8 @@ export const initialize = async () => {
     tableName: 'companies'
   })
 
-  Category.hasOne(Category, { foreignKey: { name: 'id', field: 'parentId' } })
-  Company.belongsTo(Category, {
-    foreignKey: { name: 'id', field: 'categoryId' }
-  })
+  Category.hasOne(Category, { foreignKey: 'parentId', sourceKey: 'id' })
+  Company.belongsTo(Category, { foreignKey: 'categoryId', targetKey: 'id' })
 
   await Category.sync()
   await Company.sync()
