@@ -15,7 +15,8 @@ export default class Category extends Model {
 
 export const attributes: ModelAttributes = {
   id: {
-    type: DataTypes.STRING
+    type: DataTypes.STRING,
+    unique: true
   },
   name: {
     type: DataTypes.STRING

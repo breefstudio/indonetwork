@@ -11,8 +11,7 @@ export const initialize = async () => {
   Category.init(categoryAttributes, {
     sequelize,
     charset: 'utf8mb4',
-    tableName: 'categories',
-    indexes: [{ fields: ['id'], unique: true }]
+    tableName: 'categories'
   })
   Company.init(companyAttributes, {
     sequelize,
