@@ -27,7 +27,7 @@ export const goToCompaniesPage = async (
   await tab.goto(
     `https://www.indonetwork.co.id/${category}/perusahaan?page=${page}`
   )
-  return tab.waitForSelector('.page-link.active')
+  return tab
 }
 
 export const goToCategoriesPage = async (page: Page) => {
