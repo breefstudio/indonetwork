@@ -138,7 +138,11 @@ const scrapeWithCategory = async (id: string, page: number = 1) => {
   return syncCompanies(tab, id, page)
 }
 
-const scrapeWithStart = async (id: string, page: number = 1): Promise<any> => {
+const scrapeWithStart = async (
+  id: string,
+  page: number = 1,
+  resurrectCount: number = 0
+): Promise<any> => {
   try {
     const tab = await init()
     const ids = await getCompanyCategories()
@@ -152,11 +156,14 @@ const scrapeWithStart = async (id: string, page: number = 1): Promise<any> => {
       return syncCompanies(tab, category)
     }, Promise.resolve())
   } catch (e) {
+    if (resurrectCount >= 10) {
+      throw e
+    }
     const last = await loadLastScrape()
     if (last) {
       console.log(e)
-      console.log('resurrecting ....')
-      return scrapeWithStart(last.category, last.page)
+      console.log(`resurrecting .... ${resurrectCount}`)
+      return scrapeWithStart(last.category, last.page, resurrectCount + 1)
     } else {
       throw e
     }
