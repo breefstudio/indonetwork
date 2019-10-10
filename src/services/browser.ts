@@ -1,8 +1,11 @@
 import { Browser, launch, Page } from 'puppeteer'
-import delay from '../utils/delay'
 import env from '../utils/env'
 
-export const openBrowser = () => launch({ ...env.puppeteer })
+export const openBrowser = () =>
+  launch({
+    ...env.puppeteer,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  })
 
 export const openTab = async (browser: Browser) => {
   const page = (await browser.pages())[0] || (await browser.newPage())

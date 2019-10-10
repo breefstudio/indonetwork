@@ -1,6 +1,10 @@
+import parseArgv, { OptionDefinition } from 'command-line-args'
 import { Page } from 'puppeteer'
 import { initialize } from './models'
-import CategoryModel, { CategoryEntity } from './models/category'
+import CategoryModel, {
+  CategoryEntity,
+  getCompanyCategories
+} from './models/category'
 import CompanyModel, { CompanyEntity } from './models/company'
 import {
   goToCategoriesPage,
@@ -55,37 +59,26 @@ const scrapeCompany = async (tab: Page, url: string) => {
   return getCompany(tab)
 }
 
-interface Category {
-  readonly id: string
-  readonly name: string
-  readonly companies: ReadonlyArray<Company>
-}
-
-const scrapeCompanyForCategory = async (
-  tab: Page,
-  id: string,
-  page: number = 1
-) => {
+const syncCompanies = async (tab: Page, id: string, page: number = 1) => {
   const { companies, hasNext } = await scrapeCompanies([], tab, id, page)
   if (companies.length === 0) {
     return
   }
   await CompanyModel.bulkCreate(
-    companies.map<CompanyEntity>(c => {
-      return {
-        ...c,
-        categoryId: id
-      }
-    })
+    companies.map<CompanyEntity>(c => ({ ...c, categoryId: id })),
+    { ignoreDuplicates: true }
   )
   if (hasNext) {
-    await scrapeCompanyForCategory(tab, id, page + 1)
+    await syncCompanies(tab, id, page + 1)
   }
 }
 
-const scrape = async () => {
+const init = async () => {
   await initialize()
-  const tab = await prepare()
+  return prepare()
+}
+
+const syncCategories = async (tab: Page) => {
   await goToCategoriesPage(tab)
   const categories = await getCategories(tab)
   await CategoryModel.bulkCreate(
@@ -97,17 +90,55 @@ const scrape = async () => {
       }, acc)
     }, [])
   )
+  return categories
+}
+
+const scrapeAll = async () => {
+  const tab = await init()
+  const categories = await syncCategories(tab)
   return categories.reduce<Promise<any>>(async (acc, category) => {
     if (category.children.length === 0) {
       await acc
-      return scrapeCompanyForCategory(tab, category.id)
+      return syncCompanies(tab, category.id)
     } else {
       return category.children.reduce(async (accc, sub) => {
         await accc
-        return scrapeCompanyForCategory(tab, sub.id)
+        return syncCompanies(tab, sub.id)
       }, acc)
     }
   }, Promise.resolve())
 }
 
-scrape()
+const scrapeWithCategory = async (id: string, page: number = 1) => {
+  const tab = await init()
+  return syncCompanies(tab, id, page)
+}
+
+const scrapeWithStart = async (id: string, page: number = 1) => {
+  const tab = await init()
+  const ids = await getCompanyCategories()
+  const index = ids.indexOf(id)
+  const categories = ids.slice(index)
+  return categories.reduce(async (acc, category) => {
+    await acc
+    if (id === category) {
+      return syncCompanies(tab, category, page)
+    }
+    return syncCompanies(tab, category)
+  }, Promise.resolve())
+}
+
+const argvDevinition: OptionDefinition[] = [
+  { name: 'category', alias: 'c', type: String },
+  { name: 'page', alias: 'p', type: Number }
+]
+
+const argv = process.argv.slice(2)
+
+const args = parseArgv(argvDevinition, { argv })
+
+if (args.category && args.page) {
+  scrapeWithStart(args.category, args.page)
+} else {
+  scrapeAll()
+}
