@@ -27,6 +27,7 @@ export const goToCompaniesPage = async (
   await tab.goto(
     `https://www.indonetwork.co.id/${category}/perusahaan?page=${page}`
   )
+  await tab.waitForSelector('.leftlist')
   return tab
 }
 
