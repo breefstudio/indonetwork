@@ -144,7 +144,7 @@ const scrapeWithStart = async (id: string, page: number = 1): Promise<any> => {
     const ids = await getCompanyCategories()
     const index = ids.indexOf(id)
     const categories = ids.slice(index)
-    return categories.reduce(async (acc, category) => {
+    return await categories.reduce(async (acc, category) => {
       await acc
       if (id === category) {
         return syncCompanies(tab, category, page)
