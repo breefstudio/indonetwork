@@ -1,3 +1,4 @@
+// tslint:disable: no-console
 import parseArgv, { OptionDefinition } from 'command-line-args'
 import { Page } from 'puppeteer'
 import { initialize } from './models'
@@ -6,6 +7,7 @@ import CategoryModel, {
   getCompanyCategories
 } from './models/category'
 import CompanyModel, { CompanyEntity } from './models/company'
+import OptionModel, { loadLastScrape, saveLastScrape } from './models/option'
 import {
   goToCategoriesPage,
   goToCompaniesPage,
@@ -55,11 +57,14 @@ const scrapeCompanies = async (
 }
 
 const scrapeCompany = async (tab: Page, url: string) => {
+  console.log(`mulai scrape company ${url}`)
   await goToCompanyDetailPage(tab, url)
+  console.log(`berhasil masuk halaman`)
   return getCompany(tab)
 }
 
 const syncCompanies = async (tab: Page, id: string, page: number = 1) => {
+  console.log(`mulai scrape -c ${id} -p ${page}`)
   if (!(await isLoggedIn(tab))) {
     await login(tab, auth)
   }
@@ -85,6 +90,8 @@ const syncCompanies = async (tab: Page, id: string, page: number = 1) => {
     companies.map<CompanyEntity>(c => ({ ...c, categoryId: id })),
     { ignoreDuplicates: true }
   )
+  await saveLastScrape(id, page)
+  console.log(`berhasil scrape -c ${id} -p ${page}`)
   if (hasNext) {
     await syncCompanies(tab, id, page + 1)
   }
@@ -131,18 +138,29 @@ const scrapeWithCategory = async (id: string, page: number = 1) => {
   return syncCompanies(tab, id, page)
 }
 
-const scrapeWithStart = async (id: string, page: number = 1) => {
-  const tab = await init()
-  const ids = await getCompanyCategories()
-  const index = ids.indexOf(id)
-  const categories = ids.slice(index)
-  return categories.reduce(async (acc, category) => {
-    await acc
-    if (id === category) {
-      return syncCompanies(tab, category, page)
+const scrapeWithStart = async (id: string, page: number = 1): Promise<any> => {
+  try {
+    const tab = await init()
+    const ids = await getCompanyCategories()
+    const index = ids.indexOf(id)
+    const categories = ids.slice(index)
+    return categories.reduce(async (acc, category) => {
+      await acc
+      if (id === category) {
+        return syncCompanies(tab, category, page)
+      }
+      return syncCompanies(tab, category)
+    }, Promise.resolve())
+  } catch (e) {
+    const last = await loadLastScrape()
+    if (last) {
+      console.log(e)
+      console.log('resurrecting ....')
+      return scrapeWithStart(last.category, last.page)
+    } else {
+      throw e
     }
-    return syncCompanies(tab, category)
-  }, Promise.resolve())
+  }
 }
 
 const argvDevinition: OptionDefinition[] = [
