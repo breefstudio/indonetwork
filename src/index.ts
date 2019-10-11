@@ -1,12 +1,16 @@
 // tslint:disable: no-console
 import parseArgv, { OptionDefinition } from 'command-line-args'
 import { Page } from 'puppeteer'
+import { Sequelize } from 'sequelize/types'
 import { initialize } from './models'
 import CategoryModel, {
   CategoryEntity,
   getCompanyCategories
 } from './models/category'
 import CompanyModel, { CompanyEntity } from './models/company'
+import CompanyCategoryModel, {
+  CompanyCategoryEntity
+} from './models/company-category'
 import OptionModel, { loadLastScrape, saveLastScrape } from './models/option'
 import {
   goToCategoriesPage,
@@ -63,7 +67,12 @@ const scrapeCompany = async (tab: Page, url: string) => {
   return getCompany(tab)
 }
 
-const syncCompanies = async (tab: Page, id: string, page: number = 1) => {
+const syncCompanies = async (
+  tab: Page,
+  database: Sequelize,
+  id: string,
+  page: number = 1
+) => {
   console.log(`mulai scrape -c ${id} -p ${page}`)
   if (!(await isLoggedIn(tab))) {
     await login(tab, auth)
@@ -86,20 +95,32 @@ const syncCompanies = async (tab: Page, id: string, page: number = 1) => {
   if (companies.length === 0) {
     return
   }
-  await CompanyModel.bulkCreate(
-    companies.map<CompanyEntity>(c => ({ ...c, categoryId: id })),
-    { ignoreDuplicates: true }
-  )
+  const transaction = await database.transaction()
+  try {
+    await CompanyModel.bulkCreate(
+      companies.map<CompanyEntity>(c => ({ ...c, categoryId: id })),
+      { ignoreDuplicates: true }
+    )
+    await CompanyCategoryModel.bulkCreate(
+      companies.map<CompanyCategoryEntity>(c => ({
+        companyId: c.id,
+        categoryId: id
+      })),
+      { ignoreDuplicates: true }
+    )
+  } catch (e) {
+    await transaction.rollback()
+    throw e
+  }
   await saveLastScrape(id, page)
   console.log(`berhasil scrape -c ${id} -p ${page}`)
   if (hasNext) {
-    await syncCompanies(tab, id, page + 1)
+    await syncCompanies(tab, database, id, page + 1)
   }
 }
 
 const init = async () => {
-  await initialize()
-  return prepare()
+  return { tab: await prepare(), database: await initialize() }
 }
 
 const syncCategories = async (tab: Page) => {
@@ -118,24 +139,19 @@ const syncCategories = async (tab: Page) => {
 }
 
 const scrapeAll = async () => {
-  const tab = await init()
+  const { tab, database } = await init()
   const categories = await syncCategories(tab)
   return categories.reduce<Promise<any>>(async (acc, category) => {
     if (category.children.length === 0) {
       await acc
-      return syncCompanies(tab, category.id)
+      return syncCompanies(tab, database, category.id)
     } else {
       return category.children.reduce(async (accc, sub) => {
         await accc
-        return syncCompanies(tab, sub.id)
+        return syncCompanies(tab, database, sub.id)
       }, acc)
     }
   }, Promise.resolve())
-}
-
-const scrapeWithCategory = async (id: string, page: number = 1) => {
-  const tab = await init()
-  return syncCompanies(tab, id, page)
 }
 
 const scrapeWithStart = async (
@@ -144,16 +160,16 @@ const scrapeWithStart = async (
   resurrectCount: number = 0
 ): Promise<any> => {
   try {
-    const tab = await init()
+    const { tab, database } = await init()
     const ids = await getCompanyCategories()
     const index = ids.indexOf(id)
     const categories = ids.slice(index)
     return await categories.reduce(async (acc, category) => {
       await acc
       if (id === category) {
-        return syncCompanies(tab, category, page)
+        return syncCompanies(tab, database, category, page)
       }
-      return syncCompanies(tab, category)
+      return syncCompanies(tab, database, category)
     }, Promise.resolve())
   } catch (e) {
     if (resurrectCount >= 10) {
