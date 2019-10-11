@@ -290,13 +290,44 @@ const scrapeWithStart = async (
   }
 }
 
-const resurrect = async () => {
+const scrapeResurrect = async (
+  tab: Page,
+  database: Sequelize,
+  resurrectCount: number = 0
+) => {
+  const last = await loadLastScrape()
+  if (!last) {
+    throw Error('no last!')
+  }
   try {
-    const last = await loadLastScrape()
-    await scrapeWithStart(last!!.category, last!!.page)
+    const ids = await getCompanyCategories()
+    const index = ids.indexOf(last.category)
+    const categories = ids.slice(index)
+    return await categories.reduce(async (acc, category) => {
+      await acc
+      if (last.category === category) {
+        return syncCompanies(tab, database, category, last.page)
+      }
+      return syncCompanies(tab, database, category)
+    }, Promise.resolve())
   } catch (e) {
-    console.log(e)
-    process.exit(1)
+    if (resurrectCount >= 10) {
+      throw e
+    }
+    await scrapeResurrect(tab, database, resurrectCount + 1)
+  }
+}
+
+const resurrect = async () => {
+  const { tab, database } = await init()
+  try {
+    await scrapeResurrect(tab, database)
+  } catch (e) {
+    if (e.message === 'no last!') {
+      throw e
+    } else {
+      process.exit(1)
+    }
   }
 }
 
