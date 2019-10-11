@@ -27,7 +27,11 @@ export const goToCompaniesPage = async (
   await tab.goto(
     `https://www.indonetwork.co.id/${category}/perusahaan?page=${page}`
   )
-  await tab.waitForSelector('.list-wrapper.row.prodcompany.d-block')
+  try {
+    await tab.waitForSelector('.list-wrapper.row.prodcompany.d-block')
+  } catch (e) {
+    await tab.waitForSelector('.wrapper.searchresult > h4')
+  }
   return tab
 }
 
