@@ -22,7 +22,11 @@ import {
   openTab
 } from './services/browser'
 import { getCategories } from './services/categories'
-import { getCompanies, isNextPageAvailable } from './services/companies'
+import {
+  Company as CompanyItem,
+  getCompanies,
+  isNextPageAvailable
+} from './services/companies'
 import { Company, getCompany } from './services/company'
 import { auth } from './utils/env'
 
@@ -34,6 +38,17 @@ const prepare = async () => {
     await login(tab, auth)
     return tab
   }
+}
+
+const scrapeRelations = async (
+  tab: Page,
+  category: string,
+  page: number = 1
+) => {
+  await goToCompaniesPage(tab, category, page)
+  const companies = await getCompanies(tab)
+  const hasNext = await isNextPageAvailable(tab)
+  return { companies, hasNext }
 }
 
 const scrapeCompanies = async (
@@ -65,6 +80,58 @@ const scrapeCompany = async (tab: Page, url: string) => {
   await goToCompanyDetailPage(tab, url)
   console.log(`berhasil masuk halaman`)
   return getCompany(tab)
+}
+
+const syncRelations = async (
+  tab: Page,
+  database: Sequelize,
+  id: string,
+  page: number = 1
+) => {
+  console.log(`mulai scrape -c ${id} -p ${page}`)
+  if (!(await isLoggedIn(tab))) {
+    await login(tab, auth)
+  }
+  let companies: ReadonlyArray<CompanyItem>
+  let hasNext = false
+  try {
+    const result = await scrapeRelations(tab, id, page)
+    companies = result.companies
+    hasNext = result.hasNext
+  } catch (e) {
+    if (!(await isLoggedIn(tab))) {
+      await login(tab, auth)
+      const result = await scrapeRelations(tab, id, page)
+      companies = result.companies
+      hasNext = result.hasNext
+    }
+    throw e
+  }
+  if (companies.length === 0) {
+    return
+  }
+  const transaction = await database.transaction()
+  try {
+    await CompanyCategoryModel.bulkCreate(
+      companies.map<CompanyCategoryEntity>(c => ({
+        companyId: c.url!!.replace(
+          'https://www.indonetwork.co.id/company/',
+          ''
+        ),
+        categoryId: id
+      })),
+      { ignoreDuplicates: true }
+    )
+    await transaction.commit()
+  } catch (e) {
+    await transaction.rollback()
+    throw e
+  }
+  await saveLastScrape(id, page)
+  console.log(`berhasil scrape -c ${id} -p ${page}`)
+  if (hasNext) {
+    await syncRelations(tab, database, id, page + 1)
+  }
 }
 
 const syncCompanies = async (
@@ -155,6 +222,42 @@ const scrapeAll = async () => {
   }, Promise.resolve())
 }
 
+const scrapeRelationWithStart = async (
+  id: string,
+  page: number = 1,
+  resurrectCount: number = 0
+): Promise<any> => {
+  try {
+    const { tab, database } = await init()
+    const ids = (await getCompanyCategories()).reverse()
+    const index = ids.indexOf(id)
+    const categories = ids.slice(index)
+    return await categories.reduce(async (acc, category) => {
+      await acc
+      if (id === category) {
+        return syncRelations(tab, database, category, page)
+      }
+      return syncRelations(tab, database, category)
+    }, Promise.resolve())
+  } catch (e) {
+    if (resurrectCount >= 10) {
+      throw e
+    }
+    const last = await loadLastScrape()
+    if (last) {
+      console.log(e)
+      console.log(`resurrecting .... ${resurrectCount}`)
+      return scrapeRelationWithStart(
+        last.category,
+        last.page,
+        resurrectCount + 1
+      )
+    } else {
+      throw e
+    }
+  }
+}
+
 const scrapeWithStart = async (
   id: string,
   page: number = 1,
@@ -187,17 +290,35 @@ const scrapeWithStart = async (
   }
 }
 
+const resurrect = async () => {
+  try {
+    const last = await loadLastScrape()
+    await scrapeWithStart(last!!.category, last!!.page)
+  } catch (e) {
+    console.log(e)
+    process.exit(1)
+  }
+}
+
 const argvDevinition: OptionDefinition[] = [
   { name: 'category', alias: 'c', type: String },
-  { name: 'page', alias: 'p', type: Number }
+  { name: 'page', alias: 'p', type: Number },
+  { name: 'relation', alias: 'r', type: Boolean },
+  { name: 'resurrect', type: Boolean }
 ]
 
 const argv = process.argv.slice(2)
 
 const args = parseArgv(argvDevinition, { argv })
 
-if (args.category && args.page) {
-  scrapeWithStart(args.category, args.page)
+if (args.resurrect) {
+  resurrect()
+} else if (args.category && args.page) {
+  if (args.relation) {
+    scrapeRelationWithStart(args.category, args.page)
+  } else {
+    scrapeWithStart(args.category, args.page)
+  }
 } else {
   scrapeAll()
 }

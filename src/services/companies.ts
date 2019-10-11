@@ -1,7 +1,7 @@
 import { ElementHandle, Page } from 'puppeteer'
 import { getNumberContent, getPropertyValue, getTextContent } from '../utils'
 
-interface Company {
+export interface Company {
   readonly name: string
   readonly url?: string
   readonly description: string
