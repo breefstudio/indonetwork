@@ -1,5 +1,4 @@
 // tslint:disable: no-console
-import parseArgv, { OptionDefinition } from 'command-line-args'
 import { Page } from 'puppeteer'
 import { Sequelize } from 'sequelize/types'
 import { initialize } from './models'
@@ -192,34 +191,23 @@ const init = async () => {
 }
 
 const syncCategories = async (tab: Page) => {
-  await goToCategoriesPage(tab)
-  const categories = await getCategories(tab)
-  await CategoryModel.bulkCreate(
-    categories.reduce<CategoryEntity[]>((acc, c) => {
-      acc.push({ id: c.id, name: c.name })
-      return c.children.reduce((accc, sc) => {
-        accc.push({ id: sc.id, name: sc.name, parentId: c.id })
-        return accc
-      }, acc)
-    }, [])
-  )
-  return categories
-}
-
-const scrapeAll = async () => {
-  const { tab, database } = await init()
-  const categories = await syncCategories(tab)
-  return categories.reduce<Promise<any>>(async (acc, category) => {
-    if (category.children.length === 0) {
-      await acc
-      return syncCompanies(tab, database, category.id)
-    } else {
-      return category.children.reduce(async (accc, sub) => {
-        await accc
-        return syncCompanies(tab, database, sub.id)
-      }, acc)
-    }
-  }, Promise.resolve())
+  const dd = await getCompanyCategories()
+  if (dd.length === 0) {
+    await goToCategoriesPage(tab)
+    const categories = await getCategories(tab)
+    await CategoryModel.bulkCreate(
+      categories.reduce<CategoryEntity[]>((acc, c) => {
+        acc.push({ id: c.id, name: c.name })
+        return c.children.reduce((accc, sc) => {
+          accc.push({ id: sc.id, name: sc.name, parentId: c.id })
+          return accc
+        }, acc)
+      }, [])
+    )
+    return getCompanyCategories()
+  } else {
+    return dd
+  }
 }
 
 const scrapeRelationWithStart = async (
@@ -258,54 +246,23 @@ const scrapeRelationWithStart = async (
   }
 }
 
-const scrapeWithStart = async (
-  id: string,
-  page: number = 1,
-  resurrectCount: number = 0
-): Promise<any> => {
-  try {
-    const { tab, database } = await init()
-    const ids = await getCompanyCategories()
-    const index = ids.indexOf(id)
-    const categories = ids.slice(index)
-    return await categories.reduce(async (acc, category) => {
-      await acc
-      if (id === category) {
-        return syncCompanies(tab, database, category, page)
-      }
-      return syncCompanies(tab, database, category)
-    }, Promise.resolve())
-  } catch (e) {
-    if (resurrectCount >= 10) {
-      throw e
-    }
-    const last = await loadLastScrape()
-    if (last) {
-      console.log(e)
-      console.log(`resurrecting .... ${resurrectCount}`)
-      return scrapeWithStart(last.category, last.page, resurrectCount + 1)
-    } else {
-      throw e
-    }
-  }
-}
-
 const scrapeResurrect = async (
   tab: Page,
   database: Sequelize,
+  suffix: 'asc' | 'desc',
   resurrectCount: number = 0
 ) => {
-  const last = await loadLastScrape()
-  if (!last) {
-    throw Error('no last!')
-  }
+  const last = await OptionModel.loadLastScrape(suffix)
   try {
-    const ids = await getCompanyCategories()
-    const index = ids.indexOf(last.category)
+    const ids = await getCompanyCategories(suffix === 'asc' ? 'ASC' : 'DESC')
+    let index = 0
+    if (last) {
+      index = ids.indexOf(last.category)
+    }
     const categories = ids.slice(index)
     return await categories.reduce(async (acc, category) => {
       await acc
-      if (last.category === category) {
+      if (last && last.category === category) {
         return syncCompanies(tab, database, category, last.page)
       }
       return syncCompanies(tab, database, category)
@@ -314,14 +271,34 @@ const scrapeResurrect = async (
     if (resurrectCount >= 10) {
       throw e
     }
-    await scrapeResurrect(tab, database, resurrectCount + 1)
+    await scrapeResurrect(tab, database, suffix, resurrectCount + 1)
   }
 }
 
+const prepareTab = async (suffix: 'asc' | 'desc', index: number) => {
+  const tab = await openTab(
+    await openBrowser({ userDataDir: `puppeteer/${suffix}` }),
+    index
+  )
+  if (!(await isLoggedIn(tab))) {
+    await login(tab, auth)
+  }
+  return tab
+}
+
 const resurrect = async () => {
-  const { tab, database } = await init()
+  const database = await initialize()
+  const tabAsc = await prepareTab('asc', 0)
+  if (!(await isLoggedIn(tabAsc))) {
+    await login(tabAsc, auth)
+  }
+  await syncCategories(tabAsc)
+  const tabDesc = await prepareTab('desc', 0)
   try {
-    await scrapeResurrect(tab, database)
+    await Promise.all([
+      scrapeResurrect(tabAsc, database, 'asc'),
+      scrapeResurrect(tabDesc, database, 'desc')
+    ])
   } catch (e) {
     if (e.message === 'no last!') {
       throw e
@@ -332,25 +309,4 @@ const resurrect = async () => {
   }
 }
 
-const argvDevinition: OptionDefinition[] = [
-  { name: 'category', alias: 'c', type: String },
-  { name: 'page', alias: 'p', type: Number },
-  { name: 'relation', alias: 'r', type: Boolean },
-  { name: 'resurrect', type: Boolean }
-]
-
-const argv = process.argv.slice(2)
-
-const args = parseArgv(argvDevinition, { argv })
-
-if (args.resurrect) {
-  resurrect()
-} else if (args.category && args.page) {
-  if (args.relation) {
-    scrapeRelationWithStart(args.category, args.page)
-  } else {
-    scrapeWithStart(args.category, args.page)
-  }
-} else {
-  scrapeAll()
-}
+resurrect()

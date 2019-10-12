@@ -1,14 +1,15 @@
-import { Browser, launch, Page } from 'puppeteer'
+import { Browser, launch, LaunchOptions, Page } from 'puppeteer'
 import env from '../utils/env'
 
-export const openBrowser = () =>
+export const openBrowser = (option: LaunchOptions = {}) =>
   launch({
     ...env.puppeteer,
+    ...option,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   })
 
-export const openTab = async (browser: Browser) => {
-  const page = (await browser.pages())[0] || (await browser.newPage())
+export const openTab = async (browser: Browser, index: number = 0) => {
+  const page = (await browser.pages())[index] || (await browser.newPage())
   await page.setViewport({ width: 1366, height: 768 })
   await page.goto('https://www.indonetwork.co.id')
   return page

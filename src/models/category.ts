@@ -28,7 +28,7 @@ export const attributes: ModelAttributes = {
   }
 }
 
-export const getCompanyCategories = async () => {
+export const getCompanyCategories = async (order: 'ASC' | 'DESC' = 'ASC') => {
   const parents = await Category.findAll({
     attributes: [[fn('DISTINCT', col('parentId')), 'parentId']],
     where: { parentId: { [Op.ne]: null } }
@@ -41,7 +41,7 @@ export const getCompanyCategories = async () => {
         { id: { [Op.notIn]: parents.map(v => v.parentId!!) } }
       ]
     },
-    order: [['index', 'ASC']]
+    order: [['index', order]]
   })
   return ids.map(v => v.id)
 }
