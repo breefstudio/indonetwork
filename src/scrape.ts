@@ -76,7 +76,7 @@ const scrapeCompanies = async (
     },
     Promise.resolve(acc)
   )
-  return { companies, hasNext: hasNext && items.length > 0 }
+  return { companies, items, hasNext: hasNext && items.length > 0 }
 }
 
 const scrapeCompany = async (tab: Page, url: string) => {
@@ -150,16 +150,19 @@ const syncCompanies = async (
   }
   let companies: Company[]
   let hasNext = false
+  let items: ReadonlyArray<CompanyItem>
   try {
     const result = await scrapeCompanies([], tab, id, page)
     companies = result.companies
     hasNext = result.hasNext
+    items = result.items
   } catch (e) {
     if (!(await isLoggedIn(tab))) {
       await login(tab, auth)
       const result = await scrapeCompanies([], tab, id, page)
       companies = result.companies
       hasNext = result.hasNext
+      items = result.items
     }
     throw e
   }
@@ -170,10 +173,12 @@ const syncCompanies = async (
       { ignoreDuplicates: true }
     )
     await CompanyCategoryModel.bulkCreate(
-      companies.map<CompanyCategoryEntity>(c => ({
-        companyId: c.id,
-        categoryId: id
-      })),
+      items
+        .filter(c => c.id)
+        .map<CompanyCategoryEntity>(c => ({
+          companyId: c.id!!,
+          categoryId: id
+        })),
       { ignoreDuplicates: true }
     )
     await transaction.commit()
