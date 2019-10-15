@@ -60,17 +60,9 @@ const scrapeCompanies = async (
   await goToCompaniesPage(tab, category, page)
   const items = await getCompanies(tab)
   const scraped = await CompanyModel.getCompanyIdsByIds(
-    items.map(({ url }) =>
-      url ? url.replace('https://www.indonetwork.co.id/company/', '') : ''
-    )
+    items.map(({ id }) => (id ? id : ''))
   )
-  const unscraped = items.filter(
-    ({ url }) =>
-      url &&
-      scraped.indexOf(
-        url.replace('https://www.indonetwork.co.id/company/', '')
-      ) >= 0
-  )
+  const unscraped = items.filter(({ id }) => id && scraped.indexOf(id) < 0)
   const hasNext = await isNextPageAvailable(tab)
   const companies = await unscraped.reduce<Promise<Company[]>>(
     async (p, { url, description }) => {
