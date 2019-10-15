@@ -1,4 +1,5 @@
 // tslint:disable: no-console
+import {} from 'bluebird-global'
 import { Page } from 'puppeteer'
 import { Sequelize } from 'sequelize/types'
 import { initialize } from './models'
@@ -58,8 +59,20 @@ const scrapeCompanies = async (
 ) => {
   await goToCompaniesPage(tab, category, page)
   const items = await getCompanies(tab)
+  const scraped = await CompanyModel.getCompanyIdsByIds(
+    items.map(({ url }) =>
+      url ? url.replace('https://www.indonetwork.co.id/company/', '') : ''
+    )
+  )
+  const unscraped = items.filter(
+    ({ url }) =>
+      url &&
+      scraped.indexOf(
+        url.replace('https://www.indonetwork.co.id/company/', '')
+      ) >= 0
+  )
   const hasNext = await isNextPageAvailable(tab)
-  const companies = await items.reduce<Promise<Company[]>>(
+  const companies = await unscraped.reduce<Promise<Company[]>>(
     async (p, { url, description }) => {
       const cc = await p
       if (!url) {
@@ -86,7 +99,7 @@ const syncRelations = async (
   database: Sequelize,
   id: string,
   page: number = 1
-) => {
+): Promise<void> => {
   console.log(`mulai scrape -c ${id} -p ${page}`)
   if (!(await isLoggedIn(tab))) {
     await login(tab, auth)
@@ -129,7 +142,7 @@ const syncRelations = async (
   await saveLastScrape(id, page)
   console.log(`berhasil scrape -c ${id} -p ${page}`)
   if (hasNext) {
-    await syncRelations(tab, database, id, page + 1)
+    return syncRelations(tab, database, id, page + 1)
   }
 }
 
@@ -138,7 +151,7 @@ const syncCompanies = async (
   database: Sequelize,
   id: string,
   page: number = 1
-) => {
+): Promise<void> => {
   console.log(`mulai scrape -c ${id} -p ${page}`)
   if (!(await isLoggedIn(tab))) {
     await login(tab, auth)
@@ -182,7 +195,7 @@ const syncCompanies = async (
   await saveLastScrape(id, page)
   console.log(`berhasil scrape -c ${id} -p ${page}`)
   if (hasNext) {
-    await syncCompanies(tab, database, id, page + 1)
+    return syncCompanies(tab, database, id, page + 1)
   }
 }
 
@@ -251,7 +264,7 @@ const scrapeResurrect = async (
   database: Sequelize,
   suffix: 'asc' | 'desc',
   resurrectCount: number = 0
-) => {
+): Promise<void> => {
   const last = await OptionModel.loadLastScrape(suffix)
   try {
     const ids = await getCompanyCategories(suffix === 'asc' ? 'ASC' : 'DESC')
@@ -271,7 +284,7 @@ const scrapeResurrect = async (
     if (resurrectCount >= 10) {
       throw e
     }
-    await scrapeResurrect(tab, database, suffix, resurrectCount + 1)
+    return scrapeResurrect(tab, database, suffix, resurrectCount + 1)
   }
 }
 
@@ -295,7 +308,7 @@ const resurrect = async () => {
   await syncCategories(tabAsc)
   const tabDesc = await prepareTab('desc', 0)
   try {
-    await Promise.all([
+    return await Promise.all([
       scrapeResurrect(tabAsc, database, 'asc'),
       scrapeResurrect(tabDesc, database, 'desc')
     ])

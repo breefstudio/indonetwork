@@ -2,6 +2,7 @@ import { ElementHandle, Page } from 'puppeteer'
 import { getNumberContent, getPropertyValue, getTextContent } from '../utils'
 
 export interface Company {
+  readonly id?: string
   readonly name: string
   readonly url?: string
   readonly description: string
@@ -11,11 +12,13 @@ const getCompany = async (hanlde: ElementHandle<any>): Promise<Company> => {
   const title = (await hanlde.$('div > div > h3'))!!
   const description = await getTextContent((await hanlde.$('div > div.desc'))!!)
   const name = await getTextContent(title)
-  const url = await title.$('a.link_product')
-  if (url) {
+  const urlHandle = await title.$('a.link_product')
+  if (urlHandle) {
+    const url = await getPropertyValue(urlHandle, 'href')
     return {
+      id: url.replace('https://www.indonetwork.co.id/company/', ''),
       name: name.trim(),
-      url: await getPropertyValue(url, 'href'),
+      url,
       description: description.trim()
     }
   } else {

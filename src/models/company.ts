@@ -1,4 +1,4 @@
-import { DataTypes, Model, ModelAttributes } from 'sequelize'
+import { DataTypes, Model, ModelAttributes, Op } from 'sequelize'
 
 export interface CompanyEntity {
   readonly id: string
@@ -14,6 +14,16 @@ export interface CompanyEntity {
 }
 
 export default class Company extends Model {
+  public static readonly getCompanyIdsByIds = async (
+    ids: ReadonlyArray<string>
+  ) => {
+    const data = await Company.findAll({
+      attributes: ['id'],
+      where: { id: { [Op.in]: ids } }
+    })
+    return data.map(({ id }) => id)
+  }
+
   public readonly id!: string
   public readonly name!: string
   public readonly description!: string
