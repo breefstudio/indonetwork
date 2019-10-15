@@ -276,6 +276,7 @@ const scrapeResurrect = async (
     if (resurrectCount >= 10) {
       throw e
     }
+    console.log(`resurrecting .... ${resurrectCount}`)
     return scrapeResurrect(tab, database, suffix, resurrectCount + 1)
   }
 }
