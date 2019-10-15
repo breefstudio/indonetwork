@@ -76,7 +76,7 @@ const scrapeCompanies = async (
     },
     Promise.resolve(acc)
   )
-  return { companies, hasNext }
+  return { companies, hasNext: hasNext && items.length > 0 }
 }
 
 const scrapeCompany = async (tab: Page, url: string) => {
@@ -162,9 +162,6 @@ const syncCompanies = async (
       hasNext = result.hasNext
     }
     throw e
-  }
-  if (companies.length === 0) {
-    return
   }
   const transaction = await database.transaction()
   try {
