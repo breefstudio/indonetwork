@@ -141,6 +141,7 @@ const syncRelations = async (
 const syncCompanies = async (
   tab: Page,
   database: Sequelize,
+  suffix: 'asc' | 'desc',
   id: string,
   page: number = 1
 ): Promise<void> => {
@@ -186,10 +187,10 @@ const syncCompanies = async (
     await transaction.rollback()
     throw e
   }
-  await saveLastScrape(id, page)
+  await OptionModel.saveLastScrape(suffix, { category: id, page })
   console.log(`berhasil scrape -c ${id} -p ${page}`)
   if (hasNext) {
-    return syncCompanies(tab, database, id, page + 1)
+    return syncCompanies(tab, database, suffix, id, page + 1)
   }
 }
 
@@ -270,9 +271,9 @@ const scrapeResurrect = async (
     return await categories.reduce(async (acc, category) => {
       await acc
       if (last && last.category === category) {
-        return syncCompanies(tab, database, category, last.page)
+        return syncCompanies(tab, database, suffix, category, last.page)
       }
-      return syncCompanies(tab, database, category)
+      return syncCompanies(tab, database, suffix, category)
     }, Promise.resolve())
   } catch (e) {
     if (resurrectCount >= 10) {
